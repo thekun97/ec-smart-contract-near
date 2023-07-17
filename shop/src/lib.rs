@@ -1,4 +1,3 @@
-
 use near_sdk::collections::{LookupMap, UnorderedMap, UnorderedSet};
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::{env, near_bindgen, AccountId, PanicOnDefault};
@@ -45,7 +44,7 @@ impl Shop {
       name: name.to_string(),
       location: location.to_string(),
     };
-    
+
     let mut shops_by_owner = self.shops.get(&env::signer_account_id()).unwrap_or_else(|| Vec::new());
     shops_by_owner.push(info.clone());
     self.shops.insert(&env::signer_account_id(), &shops_by_owner);
