@@ -3,15 +3,6 @@ use near_sdk::serde::{Serialize, Deserialize};
 use near_sdk::collections::{UnorderedMap, Vector};
 use near_sdk::{env, near_bindgen, AccountId, PanicOnDefault, Balance};
 
-// pub trait ImplementECommerce {
-//   fn create_shop();
-//   fn create_product();
-//   fn view_all_products();
-//   fn view_all_products_per_shop();
-//   fn view_product_by_id();
-//   fn payment(); // Payment -> Product decrement total_supply;
-// }
-
 #[derive(Serialize, Deserialize, BorshDeserialize, BorshSerialize)]
 pub struct ProductMetadata {
   pub id_product: String,
@@ -57,11 +48,7 @@ impl Product {
     }
   }
 
-  pub fn add_product(&mut self,
-                     metadata: ProductMetadata,
-                     shop_id: Option<String>,
-                     owner: Option<AccountId>
-  ) -> ProductMetadata {
+  pub fn add_product(&mut self, metadata: ProductMetadata, shop_id: Option<String>, owner: Option<AccountId>) -> ProductMetadata {
     let _owner = owner.unwrap_or(env::signer_account_id());
     // TODO: Check signer_account_id == shop owner
     let mut products_by_owner = self.products_by_owner.get(&_owner).unwrap_or_else(|| Vec::new());
@@ -114,6 +101,21 @@ impl Product {
       None
   }
 
+  // pub fn internal_transfer(&mut self, sender_id: AccountId, receiver_id: AccountId, amount: u128) {
+  //     assert!(self.balances.contains_key(&sender_id), "Sender account does not exist");
+  //     let sender_balance = self.balances.get(&sender_id).unwrap();
+  //     assert!(sender_balance >= amount, "Insufficient balance for transfer");
+  //
+  //     let new_sender_balance = sender_balance - amount;
+  //     self.balances.insert(&sender_id, &new_sender_balance);
+  //
+  //     let receiver_balance = self.balances.get(&receiver_id).unwrap_or(0);
+  //     let new_receiver_balance = receiver_balance + amount;
+  //     self.balances.insert(&receiver_id, &new_receiver_balance);
+  //
+  //     Promise::new(receiver_id).transfer(amount);
+  // }
+
   pub fn buy_products(&mut self, product_id: String, amount: u64, seller_id: AccountId) {
     let mut product = self.view_product_by_id(&product_id);
 
@@ -123,7 +125,7 @@ impl Product {
 
     // Chuyển tiền từ người mua cho người bán
     let transfer_amount = product.price;
-    self.internal_transfer(&env::predecessor_account_id(), &seller_id, transfer_amount);
+    // self.internal_transfer(&env::predecessor_account_id(), &seller_id, transfer_amount);
 
     // Trừ số lượng của sản phẩm
     self.update_product_amount(&product_id, amount);
@@ -131,6 +133,8 @@ impl Product {
     // Chuyển product cho người mua
     let mut new_product = product.clone();
     new_product.total_supply = amount;
-    self.add_product(metadata: new_product, shop_id: None, owner: env::predecessor_account_id());
+    self.add_product(metadata: new_product,
+                     shop_id: None,
+                     owner: env::predecessor_account_id());
   }
 }
