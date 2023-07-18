@@ -1,8 +1,7 @@
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::serde::{Serialize, Deserialize};
-use near_sdk::collections::{LookupMap, UnorderedMap, Vector};
-use near_sdk::{env, near_bindgen, AccountId, PanicOnDefault};
-use near_sdk::env::signer_account_id;
+use near_sdk::collections::{UnorderedMap, Vector};
+use near_sdk::{env, near_bindgen, AccountId, PanicOnDefault, Balance};
 
 // pub trait ImplementECommerce {
 //   fn create_shop();
@@ -18,7 +17,7 @@ pub struct ProductMetadata {
   pub id_product: String,
   pub name: String,
   pub category: String,
-  pub price: u64,
+  pub price: Balance,
   pub total_supply: u64,
 }
 
@@ -38,7 +37,7 @@ pub struct Product {
 #[near_bindgen]
 impl Product {
   #[init]
-  pub fn new(id: String, name: String, category: String, price: u64, shop_id: String, 
+  pub fn new(id: String, name: String, category: String, price: Balance, shop_id: String,
     total_supply: u64) -> Self {
     let metadata = ProductMetadata {
       id_product: id,
@@ -58,11 +57,16 @@ impl Product {
     }
   }
 
-  pub fn add_product(&mut self, metadata: ProductMetadata, shop_id: Option<String>) -> ProductMetadata {
+  pub fn add_product(&mut self,
+                     metadata: ProductMetadata,
+                     shop_id: Option<String>,
+                     owner: Option<AccountId>
+  ) -> ProductMetadata {
+    let _owner = owner.unwrap_or(env::signer_account_id());
     // TODO: Check signer_account_id == shop owner
-    let mut products_by_owner = self.products_by_owner.get(&env::signer_account_id()).unwrap_or_else(|| Vec::new());
+    let mut products_by_owner = self.products_by_owner.get(&_owner).unwrap_or_else(|| Vec::new());
     products_by_owner.push(metadata.clone());
-    self.products_by_owner.insert(&env::signer_account_id(), &products_by_owner);
+    self.products_by_owner.insert(&_owner, &products_by_owner);
 
     self.products.push(metadata.clone());
     if let Some(value) = shop_id {
@@ -89,14 +93,44 @@ impl Product {
     }
   }
 
-  pub fn view_product_by_id(&self, product_id: String) -> Option<ProductMetadata> {
+  pub fn view_product_by_id(&self, product_id: &String) -> Option<ProductMetadata> {
     for item in self.products.iter() {
-        if item.id == product_id {
+        if item.id == *product_id {
             return Some(item);
         }
     }
     None
   }
 
-  pub fn payment() {}
+  pub fn update_product_amount(&mut self, product_id: &String, decreased_amount: u64) -> Option<String> {
+      for product in &mut self.products {
+          if product.id == *product_id {
+              current_amount = product.total_supply;
+              product.total_supply = current_amount - decreased_amount;
+              self.products = self.products.clone();
+              Some("Success");
+          }
+      }
+      None
+  }
+
+  pub fn buy_products(&mut self, product_id: String, amount: u64, seller_id: AccountId) {
+    let mut product = self.view_product_by_id(&product_id);
+
+    assert!(product.total_supply >= amount, "Not enough items you need to buy");
+    let total_price = product.price * amount;
+    assert!(env::attached_deposit() >= total_price as u128, "Not enough NEAR to buy this product");
+
+    // Chuyển tiền từ người mua cho người bán
+    let transfer_amount = product.price;
+    self.internal_transfer(&env::predecessor_account_id(), &seller_id, transfer_amount);
+
+    // Trừ số lượng của sản phẩm
+    self.update_product_amount(&product_id, amount);
+
+    // Chuyển product cho người mua
+    let mut new_product = product.clone();
+    new_product.total_supply = amount;
+    self.add_product(metadata: new_product, shop_id: None, owner: env::predecessor_account_id());
+  }
 }
